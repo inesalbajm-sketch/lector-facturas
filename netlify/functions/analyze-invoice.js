@@ -37,7 +37,8 @@ exports.handler = async function (event) {
           contents: [{ role: "user", parts }],
           generationConfig: {
             responseMimeType: "application/json",
-            maxOutputTokens: 1000
+            maxOutputTokens: 3000,
+            thinkingConfig: { thinkingLevel: "low" }
           }
         })
       }
