@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lector de Facturas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EEF2F1;
+    --card:#FFFFFF;
+    --ink:#182028;
+    --muted:#5C6773;
+    --border:#D8E0DD;
+    --accent:#45566B;
+    --accent-soft:#45566B22;
+    --good:#1E7A4C;
+    --bad:#B23A3A;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:560px;
+    margin:0 auto;
+    padding:20px 16px 60px;
+  }
+  header.app{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:6px 2px 22px;
+  }
+  .gauge-icon{width:38px;height:38px;flex:none;color:var(--accent);transition:color .3s;}
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:22px;
+    font-weight:700;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  header.app p{
+    margin:2px 0 0;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  /* Upload zone */
+  .dropzone{
+    background:var(--card);
+    border:1.5px dashed var(--border);
+    border-radius:var(--radius);
+    padding:30px 20px;
+    text-align:center;
+    transition:border-color .2s, background .2s;
+  }
+  .dropzone.drag{
+    border-color:var(--accent);
+    background:var(--accent-soft);
+  }
+  .dropzone svg.slot{width:56px;height:56px;color:var(--accent);margin-bottom:10px;}
+  .dropzone h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:16px;
+    margin:0 0 4px;
+  }
+  .dropzone p{
+    font-size:13px;
+    color:var(--muted);
+    margin:0 0 18px;
+  }
+  .btn-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .btn{
+    appearance:none;
+    border:none;
+    border-radius:999px;
+    padding:11px 20px;
+    font-family:'IBM Plex Sans',sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    transition:transform .15s, opacity .15s;
+  }
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:var(--ink);color:#fff;}
+  .btn-ghost{background:transparent;color:var(--ink);border:1.5px solid var(--border);}
+  .btn-accent{background:var(--accent);color:#fff;}
+  .btn svg{width:16px;height:16px;}
+  input[type=file]{display:none;}
+  .filenote{font-size:12px;color:var(--muted);margin-top:14px;}
+
+  /* Loading */
+  .loading{
+    background:var(--card);
+    border-radius:var(--radius);
+    border:1px solid var(--border);
+    padding:34px 20px;
+    text-align:center;
+    margin-top:16px;
+  }
+  .spinner{
+    width:34px;height:34px;margin:0 auto 14px;
+    border-radius:50%;
+    border:3px solid var(--border);
+    border-top-color:var(--accent);
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading p{font-size:13.5px;color:var(--muted);margin:0;}
+
+  /* Error */
+  .error-box{
+    background:#FBEDEA;
+    border:1px solid #E6B4A8;
+    color:#7A2E1E;
+    border-radius:var(--radius);
+    padding:16px 18px;
+    margin-top:16px;
+    font-size:13.5px;
+  }
+  .error-box strong{display:block;margin-bottom:4px;font-size:14px;}
+
+  /* Results */
+  .results{margin-top:18px;display:none;}
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    background:var(--accent-soft);
+    color:var(--accent);
+    font-weight:600;
+    font-size:12.5px;
+    padding:5px 12px;
+    border-radius:999px;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+  .provider{font-size:13px;color:var(--muted);margin-top:6px;}
+
+  .meter-panel{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:16px;
+  }
+  .meter-cell{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px 14px;
+    position:relative;
+    overflow:hidden;
+  }
+  .meter-cell::before{
+    content:"";
+    position:absolute;top:0;left:0;right:0;height:3px;
+    background:var(--accent);
+  }
+  .meter-label{
+    font-size:11.5px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    font-weight:600;
+  }
+  .meter-value{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:26px;
+    margin-top:6px;
+    color:var(--ink);
+    letter-spacing:-0.01em;
+    font-variant-numeric:tabular-nums;
+  }
+  .meter-unit{font-size:13px;color:var(--muted);font-weight:500;margin-left:3px;}
+
+  .stat-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:10px;
+  }
+  .stat{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px 13px;
+  }
+  .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+  .stat .v{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15px;margin-top:3px;}
+
+  .section-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px;
+    font-weight:600;
+    margin:22px 0 8px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .card-list{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:11px 15px;
+    font-size:13.5px;
+    border-bottom:1px solid var(--border);
+    gap:10px;
+  }
+  .row:last-child{border-bottom:none;}
+  .row .concept{color:var(--ink);}
+  .row .amount{font-family:'IBM Plex Mono',monospace;font-weight:600;white-space:nowrap;}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:9px 12px;
+    font-size:12.5px;
+  }
+  .chip .n{color:var(--muted);display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;}
+  .chip .v{font-weight:600;}
+
+  .explain{
+    background:var(--accent-soft);
+    border-left:3px solid var(--accent);
+    border-radius:10px;
+    padding:14px 16px;
+    font-size:13.5px;
+    line-height:1.55;
+    margin-top:22px;
+    color:var(--ink);
+  }
+
+  .actions{display:flex;gap:10px;margin-top:22px;}
+
+  /* History */
+  .history{margin-top:34px;}
+  .history-toggle{
+    display:flex;align-items:center;justify-content:space-between;
+    cursor:pointer;
+    padding:2px 0;
+  }
+  .history-toggle h3{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px;margin:0;
+  }
+  .history-toggle svg{width:16px;height:16px;color:var(--muted);transition:transform .2s;}
+  .history-list{margin-top:10px;display:none;flex-direction:column;gap:8px;}
+  .hist-item{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:11px 14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    cursor:pointer;
+    font-size:12.5px;
+  }
+  .hist-item:hover{border-color:var(--accent);}
+  .hist-item .htype{font-weight:600;text-transform:capitalize;}
+  .hist-item .hdate{color:var(--muted);}
+  .hist-item .hcost{font-family:'IBM Plex Mono',monospace;font-weight:600;}
+  .empty-hist{font-size:12.5px;color:var(--muted);}
+
+  footer.note{
+    margin-top:30px;
+    font-size:11.5px;
+    color:var(--muted);
+    line-height:1.5;
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="app">
+    <svg class="gauge-icon" id="headerIcon" viewBox="0 0 48 48" fill="none">
+      <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2.4"/>
+      <path d="M24 24 L33 15" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+      <circle cx="24" cy="24" r="2.6" fill="currentColor"/>
+      <path d="M11 30 a15 15 0 0 1 26 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.35"/>
+    </svg>
+    <div>
+      <h1>Lector de Facturas</h1>
+      <p>Sube tu factura y te la explico en cristiano</p>
+    </div>
+  </header>
+
+  <div id="dropzone" class="dropzone">
+    <svg class="slot" viewBox="0 0 48 48" fill="none">
+      <rect x="10" y="6" width="28" height="36" rx="3" stroke="currentColor" stroke-width="2"/>
+      <path d="M16 16h16M16 23h16M16 30h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <h2>Foto o PDF de tu factura</h2>
+    <p>Agua, luz, gas, teléfono... Analizo el documento y calculo tu consumo diario y coste diario.</p>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnCamera">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        Hacer foto
+      </button>
+      <button class="btn btn-ghost" id="btnFile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+        Subir archivo
+      </button>
+    </div>
+    <p class="filenote">JPG, PNG o PDF · puedes seleccionar varias fotos si tu factura tiene más de una página</p>
+    <input type="file" id="inputCamera" accept="image/*" capture="environment">
+    <input type="file" id="inputFile" accept="image/*,application/pdf" multiple>
+  </div>
+
+  <div class="loading" id="loading" style="display:none;">
+    <div class="spinner"></div>
+    <p id="loadingMsg">Leyendo tu factura...</p>
+  </div>
+
+  <div class="error-box" id="errorBox" style="display:none;">
+    <strong>No he podido leer la factura</strong>
+    <span id="errorMsg"></span>
+  </div>
+
+  <div class="results" id="results">
+    <span class="badge" id="typeBadge">Factura</span>
+    <div class="provider" id="providerLine"></div>
+
+    <div class="meter-panel">
+      <div class="meter-cell">
+        <div class="meter-label">Consumo al día</div>
+        <div class="meter-value"><span id="dailyConsumption">—</span><span class="meter-unit" id="dailyConsumptionUnit"></span></div>
+      </div>
+      <div class="meter-cell">
+        <div class="meter-label">Coste al día</div>
+        <div class="meter-value"><span id="dailyCost">—</span><span class="meter-unit">€</span></div>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div id="breakdownSection" style="display:none;">
+      <div class="section-title">Desglose de la factura</div>
+      <div class="card-list" id="breakdownList"></div>
+    </div>
+
+    <div id="taxSection" style="display:none;">
+      <div class="section-title">Impuestos y recargos</div>
+      <div class="card-list" id="taxList"></div>
+    </div>
+
+    <div id="otherSection" style="display:none;">
+      <div class="section-title">Otros datos de la factura</div>
+      <div class="chips" id="otherChips"></div>
+    </div>
+
+    <div class="explain" id="explainBox"></div>
+
+    <div class="actions">
+      <button class="btn btn-accent" id="btnAnother" style="flex:1;justify-content:center;">Analizar otra factura</button>
+    </div>
+  </div>
+
+  <div class="history">
+    <div class="history-toggle" id="historyToggle">
+      <h3>Facturas analizadas antes</h3>
+      <svg id="historyChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <footer class="note">
+    Las imágenes se envían a tu propio backend, que las reenvía a la API de Gemini (Google) solo para leer los datos de la factura.<br>
+    El historial se guarda únicamente en tu cuenta, en este dispositivo.
+  </footer>
+
+</div>
+
+<script>
+const ACCENTS = {
+  agua: "#0E7C86",
+  electricidad: "#C98A1B",
+  gas: "#B5452B",
+  telefonia_internet: "#4A5FC1",
+  otro: "#45566B"
+};
+const TYPE_LABELS = {
+  agua: "Agua",
+  electricidad: "Electricidad",
+  gas: "Gas",
+  telefonia_internet: "Teléfono / Internet",
+  otro: "Suministro"
+};
+
+const dropzone = document.getElementById('dropzone');
+const btnCamera = document.getElementById('btnCamera');
+const btnFile = document.getElementById('btnFile');
+const inputCamera = document.getElementById('inputCamera');
+const inputFile = document.getElementById('inputFile');
+const loading = document.getElementById('loading');
+const loadingMsg = document.getElementById('loadingMsg');
+const errorBox = document.getElementById('errorBox');
+const errorMsg = document.getElementById('errorMsg');
+const results = document.getElementById('results');
+const btnAnother = document.getElementById('btnAnother');
+
+btnCamera.addEventListener('click', () => inputCamera.click());
+btnFile.addEventListener('click', () => inputFile.click());
+inputCamera.addEventListener('change', e => handleFiles(Array.from(e.target.files)));
+inputFile.addEventListener('change', e => handleFiles(Array.from(e.target.files)));
+
+['dragover','dragenter'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('drag'); }));
+dropzone.addEventListener('drop', e => {
+  const files = Array.from(e.dataTransfer.files || []);
+  if (files.length) handleFiles(files);
+});
+
+btnAnother.addEventListener('click', resetToUpload);
+
+function resetToUpload(){
+  results.style.display = 'none';
+  errorBox.style.display = 'none';
+  loading.style.display = 'none';
+  dropzone.style.display = 'block';
+  inputCamera.value = '';
+  inputFile.value = '';
+}
+
+const loadingPhrases = ["Leyendo tu factura...", "Buscando el consumo...", "Sumando los conceptos...", "Casi listo..."];
+let loadingInterval;
+function startLoadingMsgs(){
+  let i = 0;
+  loadingMsg.textContent = loadingPhrases[0];
+  loadingInterval = setInterval(() => {
+    i = (i+1) % loadingPhrases.length;
+    loadingMsg.textContent = loadingPhrases[i];
+  }, 1800);
+}
+function stopLoadingMsgs(){ clearInterval(loadingInterval); }
+
+async function handleFiles(files){
+  if (!files.length) return;
+  dropzone.style.display = 'none';
+  errorBox.style.display = 'none';
+  results.style.display = 'none';
+  loading.style.display = 'block';
+  startLoadingMsgs();
+
+  try{
+    const parts = await buildContentBlocks(files);
+    const data = await callGemini(parts);
+    stopLoadingMsgs();
+    loading.style.display = 'none';
+    renderResults(data);
+    await saveToHistory(data);
+    renderHistory();
+  }catch(err){
+    console.error(err);
+    stopLoadingMsgs();
+    loading.style.display = 'none';
+    errorMsg.textContent = err.message || 'Ha ocurrido un error inesperado. Prueba con otra foto o archivo, o comprueba que se ve bien el texto de la factura.';
+    errorBox.style.display = 'block';
+  }
+}
+
+async function buildContentBlocks(files){
+  const pdf = files.find(f => f.type === 'application/pdf');
+  const parts = [];
+  if (pdf){
+    const b64 = await fileToBase64(pdf);
+    parts.push({ inlineData: { mimeType: "application/pdf", data: b64 } });
+  } else {
+    const imgs = files.filter(f => f.type.startsWith('image/')).slice(0, 4);
+    if (!imgs.length) throw new Error("El archivo debe ser una imagen (JPG, PNG) o un PDF.");
+    for (const img of imgs){
+      const { base64, mediaType } = await resizeImage(img);
+      parts.push({ inlineData: { mimeType: mediaType, data: base64 } });
+    }
+  }
+  parts.push({ text: PROMPT_TEXT });
+  return parts;
+}
+
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result.split(',')[1]);
+    r.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+    r.readAsDataURL(file);
+  });
+}
+
+function resizeImage(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const maxDim = 1800;
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim){
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0,0,width,height);
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.87);
+      resolve({ base64: dataUrl.split(',')[1], mediaType: 'image/jpeg' });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo procesar la imagen.')); };
+    img.src = url;
+  });
+}
+
+const PROMPT_TEXT = `Eres un experto analizando facturas de suministros (agua, electricidad, gas, telefonía/internet, u otros) emitidas en España. Analiza el documento adjunto y devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown, siguiendo exactamente este esquema:
+
+{
+  "tipo_factura": "agua" | "electricidad" | "gas" | "telefonia_internet" | "otro",
+  "proveedor": string o null,
+  "periodo_inicio": "YYYY-MM-DD" o null,
+  "periodo_fin": "YYYY-MM-DD" o null,
+  "dias_periodo": number o null (usa este campo si la factura indica los días de facturación directamente y no puedes calcular fechas exactas),
+  "consumo_valor": number o null (el consumo total del periodo, tal cual aparece),
+  "consumo_unidad": string o null (la unidad tal cual aparece en la factura: "m³", "kWh", "L", "min", "GB", etc),
+  "importe_total": number o null (importe total a pagar, en euros, sin símbolo),
+  "desglose": [ { "concepto": string, "importe": number } ] (conceptos principales de la factura: término fijo, término variable, alquiler de equipo, etc. No incluyas aquí los impuestos),
+  "impuestos": [ { "nombre": string, "importe": number, "porcentaje": number o null } ],
+  "precio_unitario": number o null (precio por unidad de consumo en euros, solo si aparece explícito en la factura),
+  "otros_datos_relevantes": [ { "nombre": string, "valor": string } ] (máximo 4 datos útiles para entender la factura: por ejemplo potencia contratada, tarifa, tipo de contador, comparación con el periodo anterior si aparece. No incluyas datos personales como nombre, dirección o número de cliente),
+  "resumen_sencillo": string (2-3 frases explicando esta factura concreta en lenguaje llano, sin tecnicismos, como si se lo explicaras a alguien sin conocimientos técnicos)
+}
+
+Usa null en cualquier campo que no puedas determinar con seguridad a partir del documento. No inventes ni estimes datos que no estén en la factura. No incluyas nombre, dirección, DNI, ni números de cuenta o de cliente en tu respuesta.`;
+
+async function callGemini(parts){
+  const response = await fetch("/.netlify/functions/analyze-invoice", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ parts })
+  });
+  const data = await response.json();
+  if (!response.ok){
+    throw new Error(data.error || "No se ha podido contactar con el servicio de análisis. Inténtalo de nuevo en un momento.");
+  }
+  const candidate = data.candidates && data.candidates[0];
+  const text = candidate && candidate.content && candidate.content.parts
+    ? candidate.content.parts.map(p => p.text || '').join('\n')
+    : '';
+  let clean = text.replace(/```json/g,'').replace(/```/g,'').trim();
+  const first = clean.indexOf('{');
+  const last = clean.lastIndexOf('}');
+  if (first === -1 || last === -1) throw new Error("No he podido interpretar la factura. Prueba con una foto más nítida.");
+  clean = clean.slice(first, last+1);
+  try{
+    return JSON.parse(clean);
+  }catch(e){
+    throw new Error("No he podido interpretar la factura. Prueba con una foto más nítida o con el PDF original.");
+  }
+}
+
+function daysBetween(d) {
+  if (d.dias_periodo) return d.dias_periodo;
+  if (d.periodo_inicio && d.periodo_fin){
+    const a = new Date(d.periodo_inicio), b = new Date(d.periodo_fin);
+    const diff = Math.round((b - a) / 86400000) + 1;
+    if (diff > 0) return diff;
+  }
+  return null;
+}
+
+function litersOf(valor, unidad){
+  if (valor == null || !unidad) return null;
+  const u = unidad.toLowerCase();
+  if (u.includes('m3') || u.includes('m³')) return valor * 1000;
+  if (u === 'l' || u.includes('litro')) return valor;
+  return null;
+}
+
+function fmt(n, decimals){
+  if (n == null || isNaN(n)) return '—';
+  return n.toLocaleString('es-ES', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function renderResults(d){
+  const type = ['agua','electricidad','gas','telefonia_internet'].includes(d.tipo_factura) ? d.tipo_factura : 'otro';
+  const accent = ACCENTS[type];
+  document.documentElement.style.setProperty('--accent', accent);
+  document.documentElement.style.setProperty('--accent-soft', accent + '22');
+
+  document.getElementById('typeBadge').textContent = TYPE_LABELS[type];
+  document.getElementById('providerLine').textContent = d.proveedor ? d.proveedor : '';
+  document.getElementById('providerLine').style.display = d.proveedor ? 'block' : 'none';
+
+  const days = daysBetween(d);
+  const dailyCost = (d.importe_total != null && days) ? d.importe_total / days : null;
+
+  let dailyConsumptionVal = null, dailyConsumptionUnit = '';
+  if (d.consumo_valor != null && days){
+    const liters = litersOf(d.consumo_valor, d.consumo_unidad);
+    if (type === 'agua' && liters != null){
+      dailyConsumptionVal = liters / days;
+      dailyConsumptionUnit = ' L';
+    } else {
+      dailyConsumptionVal = d.consumo_valor / days;
+      dailyConsumptionUnit = ' ' + (d.consumo_unidad || 'ud');
+    }
+  }
+
+  document.getElementById('dailyConsumption').textContent = dailyConsumptionVal != null ? fmt(dailyConsumptionVal, dailyConsumptionVal < 10 ? 2 : 1) : '—';
+  document.getElementById('dailyConsumptionUnit').textContent = dailyConsumptionVal != null ? dailyConsumptionUnit + '/día' : '';
+  document.getElementById('dailyCost').textContent = dailyCost != null ? fmt(dailyCost, 2) : '—';
+
+  const priceUnit = d.precio_unitario != null ? d.precio_unitario :
+    (d.importe_total != null && d.consumo_valor ? d.importe_total / d.consumo_valor : null);
+
+  const statGrid = document.getElementById('statGrid');
+  statGrid.innerHTML = '';
+  const stats = [];
+  if (d.importe_total != null) stats.push(['Importe total', fmt(d.importe_total,2) + ' €']);
+  if (days) stats.push(['Días facturados', days + (d.periodo_inicio && d.periodo_fin ? ` (${d.periodo_inicio} a ${d.periodo_fin})` : '')]);
+  if (d.consumo_valor != null) stats.push(['Consumo total', fmt(d.consumo_valor, 2) + ' ' + (d.consumo_unidad || '')]);
+  if (priceUnit != null) stats.push(['Precio por ' + (d.consumo_unidad || 'unidad'), fmt(priceUnit, 4) + ' €']);
+  stats.forEach(([l,v]) => {
+    const el = document.createElement('div');
+    el.className = 'stat';
+    el.innerHTML = `<div class="l">${l}</div><div class="v">${v}</div>`;
+    statGrid.appendChild(el);
+  });
+
+  const breakdownSection = document.getElementById('breakdownSection');
+  const breakdownList = document.getElementById('breakdownList');
+  breakdownList.innerHTML = '';
+  if (d.desglose && d.desglose.length){
+    d.desglose.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<span class="concept">${item.concepto}</span><span class="amount">${fmt(item.importe,2)} €</span>`;
+      breakdownList.appendChild(row);
+    });
+    breakdownSection.style.display = 'block';
+  } else breakdownSection.style.display = 'none';
+
+  const taxSection = document.getElementById('taxSection');
+  const taxList = document.getElementById('taxList');
+  taxList.innerHTML = '';
+  if (d.impuestos && d.impuestos.length){
+    d.impuestos.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const pct = item.porcentaje != null ? ` (${item.porcentaje}%)` : '';
+      row.innerHTML = `<span class="concept">${item.nombre}${pct}</span><span class="amount">${fmt(item.importe,2)} €</span>`;
+      taxList.appendChild(row);
+    });
+    taxSection.style.display = 'block';
+  } else taxSection.style.display = 'none';
+
+  const otherSection = document.getElementById('otherSection');
+  const otherChips = document.getElementById('otherChips');
+  otherChips.innerHTML = '';
+  if (d.otros_datos_relevantes && d.otros_datos_relevantes.length){
+    d.otros_datos_relevantes.forEach(item => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<span class="n">${item.nombre}</span><span class="v">${item.valor}</span>`;
+      otherChips.appendChild(chip);
+    });
+    otherSection.style.display = 'block';
+  } else otherSection.style.display = 'none';
+
+  document.getElementById('explainBox').textContent = d.resumen_sencillo || 'No se ha podido generar una explicación para esta factura.';
+
+  results.style.display = 'block';
+  results._data = d;
+  results._computed = { days, dailyCost, dailyConsumptionVal, dailyConsumptionUnit, type };
+}
+
+// ---- Historial (window.storage) ----
+async function saveToHistory(d){
+  const days = daysBetween(d);
+  const dailyCost = (d.importe_total != null && days) ? d.importe_total / days : null;
+  const entry = {
+    id: Date.now(),
+    fecha_analisis: new Date().toISOString(),
+    tipo_factura: d.tipo_factura || 'otro',
+    proveedor: d.proveedor || null,
+    importe_total: d.importe_total || null,
+    dias_periodo: days,
+    coste_diario: dailyCost,
+    consumo_valor: d.consumo_valor || null,
+    consumo_unidad: d.consumo_unidad || null,
+    periodo_inicio: d.periodo_inicio || null,
+    periodo_fin: d.periodo_fin || null,
+    resumen_sencillo: d.resumen_sencillo || null
+  };
+  try{
+    let historial = [];
+    try{
+      const res = await window.storage.get('historial-facturas', false);
+      if (res && res.value) historial = JSON.parse(res.value);
+    }catch(e){ historial = []; }
+    historial.unshift(entry);
+    historial = historial.slice(0, 20);
+    await window.storage.set('historial-facturas', JSON.stringify(historial), false);
+  }catch(e){
+    console.warn('No se pudo guardar en el historial', e);
+  }
+}
+
+async function loadHistory(){
+  try{
+    const res = await window.storage.get('historial-facturas', false);
+    if (res && res.value) return JSON.parse(res.value);
+  }catch(e){ /* sin historial todavia */ }
+  return [];
+}
+
+async function renderHistory(){
+  const list = document.getElementById('historyList');
+  const historial = await loadHistory();
+  list.innerHTML = '';
+  if (!historial.length){
+    list.innerHTML = '<div class="empty-hist">Todavía no has analizado ninguna factura.</div>';
+    return;
+  }
+  historial.forEach(h => {
+    const item = document.createElement('div');
+    item.className = 'hist-item';
+    const dateStr = new Date(h.fecha_analisis).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric' });
+    item.innerHTML = `
+      <div>
+        <div class="htype">${TYPE_LABELS[h.tipo_factura] || 'Suministro'}${h.proveedor ? ' · ' + h.proveedor : ''}</div>
+        <div class="hdate">${dateStr}${h.periodo_inicio && h.periodo_fin ? ' · ' + h.periodo_inicio + ' a ' + h.periodo_fin : ''}</div>
+      </div>
+      <div class="hcost">${h.coste_diario != null ? fmt(h.coste_diario,2) + ' €/día' : (h.importe_total != null ? fmt(h.importe_total,2)+' €' : '')}</div>
+    `;
+    item.addEventListener('click', () => {
+      document.getElementById('typeBadge').scrollIntoView({ behavior:'smooth', block:'start' });
+      dropzone.style.display = 'none';
+      renderResults({
+        tipo_factura: h.tipo_factura, proveedor: h.proveedor, periodo_inicio: h.periodo_inicio,
+        periodo_fin: h.periodo_fin, dias_periodo: h.dias_periodo, consumo_valor: h.consumo_valor,
+        consumo_unidad: h.consumo_unidad, importe_total: h.importe_total, desglose: [], impuestos: [],
+        precio_unitario: null, otros_datos_relevantes: [], resumen_sencillo: h.resumen_sencillo
+      });
+    });
+    list.appendChild(item);
+  });
+}
+
+const historyToggle = document.getElementById('historyToggle');
+const historyList = document.getElementById('historyList');
+const historyChevron = document.getElementById('historyChevron');
+let historyOpen = false;
+historyToggle.addEventListener('click', () => {
+  historyOpen = !historyOpen;
+  historyList.style.display = historyOpen ? 'flex' : 'none';
+  historyChevron.style.transform = historyOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+});
+
+renderHistory();
+</script>
+</body>
+</html>
